@@ -8,36 +8,68 @@ const client = new Client({
   ]
 });
 
-// 🎨 Graphic Design / Photoshop Statuses
-const statuses = [
+// 🎨 Activities
+const dayActivities = [
   { name: "Designing in Photoshop 🎨", type: ActivityType.Playing },
   { name: "Turning Ideas into Art ✨", type: ActivityType.Watching },
-  { name: "Layers • Masks • Magic 🖌️", type: ActivityType.Playing },
-  { name: "Creative Mode: ON ⚡", type: ActivityType.Listening },
-  { name: "Logos | Banners | Branding 💎", type: ActivityType.Watching },
-  { name: "Pixels over Perfection 🧠", type: ActivityType.Playing },
-  { name: "Graphic Design Studio 🎧", type: ActivityType.Listening }
+  { name: "Logos | Banners | Branding 💎", type: ActivityType.Watching }
 ];
 
-let statusIndex = 0;
+const nightActivities = [
+  { name: "Late Night Creativity 🌙", type: ActivityType.Listening },
+  { name: "Creative Mode: ON ⚡", type: ActivityType.Playing }
+];
+
+let activityIndex = 0;
+
+// ⏰ Get India Time (IST)
+function getISTHour() {
+  return new Date().toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "numeric",
+    hour12: false
+  });
+}
 
 client.once("ready", () => {
   console.log(`✅ Bot Online: ${client.user.tag}`);
-  client.user.setStatus("online");
 
   setInterval(() => {
-    const status = statuses[statusIndex];
-    client.user.setActivity(status.name, { type: status.type });
-    statusIndex = (statusIndex + 1) % statuses.length;
-  }, 10000);
+    const hour = parseInt(getISTHour());
+
+    // 🌞 DAY TIME
+    if (hour >= 9 && hour < 24) {
+      client.user.setStatus("online");
+
+      const activity = dayActivities[activityIndex % dayActivities.length];
+      client.user.setActivity(activity.name, { type: activity.type });
+    }
+
+    // 🌙 MID NIGHT
+    else if (hour >= 0 && hour < 2) {
+      client.user.setStatus("idle");
+
+      const activity = nightActivities[activityIndex % nightActivities.length];
+      client.user.setActivity(activity.name, { type: activity.type });
+    }
+
+    // 😴 SLEEP TIME
+    else {
+      client.user.setStatus("dnd");
+      client.user.setActivity("Sleeping 😴", { type: ActivityType.Watching });
+    }
+
+    activityIndex++;
+  }, 300000); // 🔁 Every 5 minutes
 });
 
 client.on("messageCreate", (message) => {
   if (message.author.bot) return;
 
   if (message.content === "!ping") {
-    message.reply("🏓 Pong! Bot is working 🚀");
+    message.reply("🏓 Pong! Bot is Active 🚀");
   }
 });
 
 client.login(process.env.TOKEN);
+
