@@ -17,66 +17,58 @@ const client = new Client({
   ]
 });
 
-// 🎨 Auto Statuses
+/* ================= BRAND CONFIG ================= */
+const BRAND = {
+  name: "aniketshare",
+  color: 0x22c55e, // premium green
+  logo: "https://aniketshare.framer.website/favicon.ico"
+};
+
+/* ================= AUTO STATUS ================= */
 const statuses = [
   { name: "Designing in Photoshop 🎨", type: ActivityType.Playing },
   { name: "Turning Ideas into Art ✨", type: ActivityType.Watching },
-  { name: "Layers • Masks • Magic 🖌️", type: ActivityType.Playing },
   { name: "Creative Mode: ON ⚡", type: ActivityType.Listening },
-  { name: "Logos | Banners | Branding 💎", type: ActivityType.Watching },
-  { name: "Pixels over Perfection 🧠", type: ActivityType.Playing },
-  { name: "Graphic Design Studio 🎧", type: ActivityType.Listening }
+  { name: "Logos | Banners | Branding 💎", type: ActivityType.Watching }
 ];
 
 let statusIndex = 0;
 
-// 🔔 Slash Command
+/* ================= SLASH COMMAND ================= */
 const commands = [
   new SlashCommandBuilder()
     .setName("noti")
-    .setDescription("Send professional DM notification")
-    .addUserOption(option =>
-      option.setName("user")
-        .setDescription("User to notify")
-        .setRequired(true)
+    .setDescription("Send premium project notification (DM)")
+    .addUserOption(o =>
+      o.setName("user").setDescription("User").setRequired(true)
     )
-    .addStringOption(option =>
-      option.setName("project")
-        .setDescription("Project name")
-        .setRequired(true)
+    .addStringOption(o =>
+      o.setName("project").setDescription("Project name").setRequired(true)
     )
-    .addStringOption(option =>
-      option.setName("filename")
-        .setDescription("File name")
-        .setRequired(true)
+    .addStringOption(o =>
+      o.setName("filename").setDescription("File name").setRequired(true)
     )
-    .addStringOption(option =>
-      option.setName("status")
-        .setDescription("Project status")
-        .setRequired(true)
+    .addStringOption(o =>
+      o.setName("status").setDescription("Status").setRequired(true)
     )
-    .addStringOption(option =>
-      option.setName("size")
-        .setDescription("File size")
-        .setRequired(true)
+    .addStringOption(o =>
+      o.setName("size").setDescription("File size").setRequired(true)
     )
-    .addStringOption(option =>
-      option.setName("link")
-        .setDescription("Download/View link")
-        .setRequired(true)
+    .addStringOption(o =>
+      o.setName("link").setDescription("Download/View link").setRequired(true)
     )
-].map(cmd => cmd.toJSON());
+].map(c => c.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
-// 🚀 Ready
+/* ================= READY ================= */
 client.once("ready", async () => {
   console.log(`✅ Bot Online: ${client.user.tag}`);
   client.user.setStatus("online");
 
   setInterval(() => {
-    const status = statuses[statusIndex];
-    client.user.setActivity(status.name, { type: status.type });
+    const s = statuses[statusIndex];
+    client.user.setActivity(s.name, { type: s.type });
     statusIndex = (statusIndex + 1) % statuses.length;
   }, 10000);
 
@@ -88,17 +80,16 @@ client.once("ready", async () => {
   console.log("✅ /noti command registered");
 });
 
-// 🔔 Command Handler
+/* ================= COMMAND HANDLER ================= */
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== "noti") return;
 
   const roleName = "Aniketshare/Noti";
 
-  // 🔐 Role Check
   if (!interaction.member.roles.cache.some(r => r.name === roleName)) {
     return interaction.reply({
-      content: "❌ Tumhare paas `Aniketshare/Noti` role nahi hai!",
+      content: "❌ You don't have permission to use this command.",
       ephemeral: true
     });
   }
@@ -110,50 +101,53 @@ client.on("interactionCreate", async (interaction) => {
   const size = interaction.options.getString("size");
   const link = interaction.options.getString("link");
 
-  // ✨ EMBED
+  /* ================= POLISHED EMBED ================= */
   const embed = new EmbedBuilder()
-    .setColor("#00ff99")
+    .setColor(BRAND.color)
     .setAuthor({
-      name: `Notification from ${interaction.guild.name}`,
-      iconURL: interaction.guild.iconURL()
+      name: `📢 Notification from ${interaction.guild.name}`,
+      iconURL: interaction.guild.iconURL({ dynamic: true })
     })
-    .setDescription(
-      `**Project:** ${project}
-**File Name:** ${filename}
-**Status:** ${status}
-**Size:** ${size}
-
-🔗 **Click below to view or download your files**
-${link}`
+    .setThumbnail(BRAND.logo)
+    .setDescription("🚀 **Your project update is here!**")
+    .addFields(
+      { name: "🧩 Project", value: project, inline: true },
+      { name: "📄 File Name", value: filename, inline: true },
+      { name: "📊 Status", value: status, inline: true },
+      { name: "💾 Size", value: size, inline: true },
+      {
+        name: "🔗 Download / View Files",
+        value: `[👉 Click here to access your files](${link})`
+      }
     )
     .setFooter({
-      text: "aniketshare • Elevate Your Brand with Stunning Visuals"
+      text: `${BRAND.name} • Elevate Your Brand with Stunning Visuals`,
+      iconURL: BRAND.logo
     })
     .setTimestamp();
 
   try {
     await user.send({ embeds: [embed] });
     await interaction.reply({
-      content: `✅ DM sent to **${user.tag}**`,
+      content: `✅ Notification sent to **${user.tag}**`,
       ephemeral: true
     });
-  } catch (e) {
+  } catch {
     await interaction.reply({
-      content: "❌ User ke DMs closed hain.",
+      content: "❌ User DMs are closed.",
       ephemeral: true
     });
   }
 });
 
-// 🧪 Test
-client.on("messageCreate", (message) => {
-  if (message.author.bot) return;
-  if (message.content === "!ping") {
-    message.reply("🏓 Pong! Bot Working 🚀");
-  }
+/* ================= TEST ================= */
+client.on("messageCreate", msg => {
+  if (msg.author.bot) return;
+  if (msg.content === "!ping") msg.reply("🏓 Pong!");
 });
 
 client.login(process.env.TOKEN);
+
 
 
 
