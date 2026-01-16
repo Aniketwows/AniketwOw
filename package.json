@@ -1,7 +1,7 @@
 {
   "name": "aniketwow-bot",
   "version": "1.0.0",
-  "description": "Discord Notification Bot with Role Permission",
+  "description": "Professional Discord Notification Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -11,4 +11,5 @@
     "@discordjs/rest": "^2.4.0"
   }
 }
+
 
