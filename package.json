@@ -1,12 +1,14 @@
 {
   "name": "aniketwow-bot",
   "version": "1.0.0",
-  "description": "Graphic Design Discord Bot",
+  "description": "Discord Notification Bot with Role Permission",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.14.1"
+    "discord.js": "^14.14.1",
+    "@discordjs/rest": "^2.4.0"
   }
 }
+
