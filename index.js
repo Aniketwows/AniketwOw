@@ -17,11 +17,11 @@ const client = new Client({
   ]
 });
 
-/* ========== CONFIG ========== */
-const ROLE_NAME = "Aniketshare/Noti"; // role allowed
+/* ================= CONFIG ================= */
+const ROLE_NAME = "Aniketshare/Noti"; // allowed role
 const BRAND_COLOR = 0x22c55e;
 
-/* ========== AUTO STATUS ========== */
+/* ================= AUTO STATUS ================= */
 const statuses = [
   { name: "Designing in Photoshop 🎨", type: ActivityType.Playing },
   { name: "Turning Ideas into Art ✨", type: ActivityType.Watching },
@@ -29,7 +29,7 @@ const statuses = [
 ];
 let statusIndex = 0;
 
-/* ========== SLASH COMMAND (HIDDEN BY DEFAULT) ========== */
+/* ================= SLASH COMMAND (HIDDEN) ================= */
 const commands = [
   new SlashCommandBuilder()
     .setName("noti")
@@ -57,8 +57,8 @@ const commands = [
 
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
-/* ========== READY ========== */
-client.once("ready", async () => {
+/* ================= READY (FIXED) ================= */
+client.once("clientReady", async () => {
   console.log(`✅ Bot Online: ${client.user.tag}`);
   client.user.setStatus("online");
 
@@ -76,12 +76,12 @@ client.once("ready", async () => {
   console.log("✅ /noti command registered (permission locked)");
 });
 
-/* ========== COMMAND HANDLER ========== */
+/* ================= COMMAND HANDLER ================= */
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== "noti") return;
 
-  // 🔐 Safety role check (second layer)
+  // 🔐 second-layer security
   if (!interaction.member.roles.cache.some(r => r.name === ROLE_NAME)) {
     return interaction.reply({
       content: "❌ You don't have permission to use this command.",
@@ -96,7 +96,6 @@ client.on("interactionCreate", async (interaction) => {
   const size = interaction.options.getString("size");
   const link = interaction.options.getString("link");
 
-  /* ========== CLEAN EMBED (NO EXTRA FOOTER TEXT) ========== */
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)
     .setAuthor({
@@ -128,13 +127,14 @@ ${link}`
   }
 });
 
-/* ========== TEST ========== */
+/* ================= TEST ================= */
 client.on("messageCreate", msg => {
   if (msg.author.bot) return;
   if (msg.content === "!ping") msg.reply("🏓 Pong!");
 });
 
 client.login(process.env.TOKEN);
+
 
 
 
