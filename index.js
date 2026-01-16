@@ -17,30 +17,26 @@ const client = new Client({
   ]
 });
 
-/* ================= BRAND CONFIG ================= */
-const BRAND = {
-  name: "aniketshare",
-  color: 0x22c55e, // premium green
-  logo: "https://aniketshare.framer.website/favicon.ico"
-};
+/* ========== CONFIG ========== */
+const ROLE_NAME = "Aniketshare/Noti"; // role allowed
+const BRAND_COLOR = 0x22c55e;
 
-/* ================= AUTO STATUS ================= */
+/* ========== AUTO STATUS ========== */
 const statuses = [
   { name: "Designing in Photoshop 🎨", type: ActivityType.Playing },
   { name: "Turning Ideas into Art ✨", type: ActivityType.Watching },
-  { name: "Creative Mode: ON ⚡", type: ActivityType.Listening },
-  { name: "Logos | Banners | Branding 💎", type: ActivityType.Watching }
+  { name: "Creative Mode: ON ⚡", type: ActivityType.Listening }
 ];
-
 let statusIndex = 0;
 
-/* ================= SLASH COMMAND ================= */
+/* ========== SLASH COMMAND (HIDDEN BY DEFAULT) ========== */
 const commands = [
   new SlashCommandBuilder()
     .setName("noti")
-    .setDescription("Send premium project notification (DM)")
+    .setDescription("Send professional DM notification")
+    .setDefaultMemberPermissions(0) // 🔒 hidden from everyone
     .addUserOption(o =>
-      o.setName("user").setDescription("User").setRequired(true)
+      o.setName("user").setDescription("User to notify").setRequired(true)
     )
     .addStringOption(o =>
       o.setName("project").setDescription("Project name").setRequired(true)
@@ -55,13 +51,13 @@ const commands = [
       o.setName("size").setDescription("File size").setRequired(true)
     )
     .addStringOption(o =>
-      o.setName("link").setDescription("Download/View link").setRequired(true)
+      o.setName("link").setDescription("Download / View link").setRequired(true)
     )
 ].map(c => c.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
-/* ================= READY ================= */
+/* ========== READY ========== */
 client.once("ready", async () => {
   console.log(`✅ Bot Online: ${client.user.tag}`);
   client.user.setStatus("online");
@@ -77,17 +73,16 @@ client.once("ready", async () => {
     { body: commands }
   );
 
-  console.log("✅ /noti command registered");
+  console.log("✅ /noti command registered (permission locked)");
 });
 
-/* ================= COMMAND HANDLER ================= */
+/* ========== COMMAND HANDLER ========== */
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== "noti") return;
 
-  const roleName = "Aniketshare/Noti";
-
-  if (!interaction.member.roles.cache.some(r => r.name === roleName)) {
+  // 🔐 Safety role check (second layer)
+  if (!interaction.member.roles.cache.some(r => r.name === ROLE_NAME)) {
     return interaction.reply({
       content: "❌ You don't have permission to use this command.",
       ephemeral: true
@@ -101,29 +96,22 @@ client.on("interactionCreate", async (interaction) => {
   const size = interaction.options.getString("size");
   const link = interaction.options.getString("link");
 
-  /* ================= POLISHED EMBED ================= */
+  /* ========== CLEAN EMBED (NO EXTRA FOOTER TEXT) ========== */
   const embed = new EmbedBuilder()
-    .setColor(BRAND.color)
+    .setColor(BRAND_COLOR)
     .setAuthor({
-      name: `📢 Notification from ${interaction.guild.name}`,
+      name: `Notification from ${interaction.guild.name}`,
       iconURL: interaction.guild.iconURL({ dynamic: true })
     })
-    .setThumbnail(BRAND.logo)
-    .setDescription("🚀 **Your project update is here!**")
-    .addFields(
-      { name: "🧩 Project", value: project, inline: true },
-      { name: "📄 File Name", value: filename, inline: true },
-      { name: "📊 Status", value: status, inline: true },
-      { name: "💾 Size", value: size, inline: true },
-      {
-        name: "🔗 Download / View Files",
-        value: `[👉 Click here to access your files](${link})`
-      }
+    .setDescription(
+      `**Project:** ${project}
+**File Name:** ${filename}
+**Status:** ${status}
+**Size:** ${size}
+
+🔗 **Click below to view or download your files**
+${link}`
     )
-    .setFooter({
-      text: `${BRAND.name} • Elevate Your Brand with Stunning Visuals`,
-      iconURL: BRAND.logo
-    })
     .setTimestamp();
 
   try {
@@ -134,19 +122,20 @@ client.on("interactionCreate", async (interaction) => {
     });
   } catch {
     await interaction.reply({
-      content: "❌ User DMs are closed.",
+      content: "❌ User ke DMs closed hain.",
       ephemeral: true
     });
   }
 });
 
-/* ================= TEST ================= */
+/* ========== TEST ========== */
 client.on("messageCreate", msg => {
   if (msg.author.bot) return;
   if (msg.content === "!ping") msg.reply("🏓 Pong!");
 });
 
 client.login(process.env.TOKEN);
+
 
 
 
