@@ -1,7 +1,7 @@
 {
   "name": "aniketwow-bot",
   "version": "1.0.0",
-  "description": "Premium Discord Notification Bot",
+  "description": "Role Locked Discord Notification Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
