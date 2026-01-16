@@ -22,7 +22,7 @@ const client = new Client({
 
 /* ================= CONFIG ================= */
 const ROLE_NAME = "Aniketshare/Noti";
-const BRAND_COLOR = 0x22c55e;
+const BRAND_COLOR = 0xbcbcbc;
 
 /* ================= AUTO STATUS ================= */
 const statuses = [
