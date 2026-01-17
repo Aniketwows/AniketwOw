@@ -22,7 +22,7 @@ const client = new Client({
 
 /* ================= CONFIG ================= */
 const ROLE_NAME = "Aniketshare/Noti";
-const BRAND_COLOR =  0x595967;
+const BRAND_COLOR = 0x595967;
 
 /* ================= AUTO STATUS ================= */
 const statuses = [
@@ -42,19 +42,34 @@ const commands = [
       o.setName("user").setDescription("User to notify").setRequired(true)
     )
     .addStringOption(o =>
-      o.setName("project").setDescription("Project name").setRequired(true)
+      o
+        .setName("project")
+        .setDescription("Project name (optional)")
+        .setRequired(false)
     )
     .addStringOption(o =>
-      o.setName("filename").setDescription("File name").setRequired(true)
+      o
+        .setName("filename")
+        .setDescription("File names (multiple lines allowed, Shift+Enter)")
+        .setRequired(false)
     )
     .addStringOption(o =>
-      o.setName("status").setDescription("Status").setRequired(true)
+      o
+        .setName("status")
+        .setDescription("Status (optional)")
+        .setRequired(false)
     )
     .addStringOption(o =>
-      o.setName("size").setDescription("File size").setRequired(true)
+      o
+        .setName("size")
+        .setDescription("File size (optional)")
+        .setRequired(false)
     )
     .addStringOption(o =>
-      o.setName("link").setDescription("Download / View link").setRequired(true)
+      o
+        .setName("link")
+        .setDescription("Multiple links allowed (one per line)")
+        .setRequired(false)
     )
 ].map(c => c.toJSON());
 
@@ -76,7 +91,7 @@ client.once("clientReady", async () => {
     { body: commands }
   );
 
-  console.log("✅ /noti command registered (permission locked)");
+  console.log("✅ /noti command registered");
 });
 
 /* ================= COMMAND HANDLER ================= */
@@ -92,11 +107,12 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   const user = interaction.options.getUser("user");
-  const project = interaction.options.getString("project");
-  const filename = interaction.options.getString("filename");
-  const status = interaction.options.getString("status");
-  const size = interaction.options.getString("size");
-  const link = interaction.options.getString("link");
+
+  const project  = interaction.options.getString("project")  || "—";
+  const filename = interaction.options.getString("filename") || "—";
+  const status   = interaction.options.getString("status")   || "In progress";
+  const size     = interaction.options.getString("size")     || "N/A";
+  const link     = interaction.options.getString("link");
 
   /* ========== EMBED ========== */
   const embed = new EmbedBuilder()
@@ -105,26 +121,42 @@ client.on("interactionCreate", async (interaction) => {
       name: `Notification from ${interaction.guild.name}`,
       iconURL: interaction.guild.iconURL({ dynamic: true })
     })
-    .setDescription(
-      `**Project:** ${project}
-**File Name:** ${filename}
-**Status:** ${status}
-**Size:** ${size}`
+    .addFields(
+      { name: "🧩 Project", value: project },
+      { name: "📁 Files", value: filename },
+      { name: "📌 Status", value: status, inline: true },
+      { name: "📦 Size", value: size, inline: true }
     )
     .setTimestamp();
 
-  /* ========== LINK BUTTON ========== */
-  const buttonRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setLabel("📥 View / Download Files")
-      .setStyle(ButtonStyle.Link)
-      .setURL(link)
-  );
+  /* ========== MULTI-LINK SUPPORT ========== */
+  const components = [];
+
+  if (link) {
+    const linksFormatted = link
+      .split("\n")
+      .map((l, i) => `[File ${i + 1}](${l.trim()})`)
+      .join("\n");
+
+    embed.addFields({
+      name: "🔗 Links",
+      value: linksFormatted
+    });
+
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel("📥 Open Files")
+          .setStyle(ButtonStyle.Link)
+          .setURL(link.split("\n")[0].trim())
+      )
+    );
+  }
 
   try {
     await user.send({
       embeds: [embed],
-      components: [buttonRow]
+      components
     });
 
     await interaction.reply({
