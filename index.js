@@ -42,33 +42,24 @@ const commands = [
       o.setName("user").setDescription("User to notify").setRequired(true)
     )
     .addStringOption(o =>
-      o
-        .setName("project")
-        .setDescription("Project name (optional)")
-        .setRequired(false)
+      o.setName("project").setDescription("Project name").setRequired(false)
     )
     .addStringOption(o =>
       o
         .setName("filename")
-        .setDescription("File names (multiple lines allowed, Shift+Enter)")
+        .setDescription("File names (use | for multiple)")
         .setRequired(false)
     )
     .addStringOption(o =>
-      o
-        .setName("status")
-        .setDescription("Status (optional)")
-        .setRequired(false)
+      o.setName("status").setDescription("Status").setRequired(false)
     )
     .addStringOption(o =>
-      o
-        .setName("size")
-        .setDescription("File size (optional)")
-        .setRequired(false)
+      o.setName("size").setDescription("File size").setRequired(false)
     )
     .addStringOption(o =>
       o
         .setName("link")
-        .setDescription("Multiple links allowed (one per line)")
+        .setDescription("Multiple links (one per line)")
         .setRequired(false)
     )
 ].map(c => c.toJSON());
@@ -108,11 +99,19 @@ client.on("interactionCreate", async (interaction) => {
 
   const user = interaction.options.getUser("user");
 
-  const project  = interaction.options.getString("project")  || "—";
-  const filename = interaction.options.getString("filename") || "—";
-  const status   = interaction.options.getString("status")   || "In progress";
-  const size     = interaction.options.getString("size")     || "N/A";
-  const link     = interaction.options.getString("link");
+  const project = interaction.options.getString("project") || "—";
+  const status  = interaction.options.getString("status") || "In progress";
+  const size    = interaction.options.getString("size") || "N/A";
+  const link    = interaction.options.getString("link");
+
+  /* ===== FILE LIST (| → multiline) ===== */
+  const fileInput = interaction.options.getString("filename") || "—";
+  const files = fileInput.includes("|")
+    ? fileInput
+        .split("|")
+        .map(f => `• ${f.trim()}`)
+        .join("\n")
+    : fileInput;
 
   /* ========== EMBED ========== */
   const embed = new EmbedBuilder()
@@ -123,13 +122,13 @@ client.on("interactionCreate", async (interaction) => {
     })
     .addFields(
       { name: "🧩 Project", value: project },
-      { name: "📁 Files", value: filename },
+      { name: "📁 Files", value: files },
       { name: "📌 Status", value: status, inline: true },
       { name: "📦 Size", value: size, inline: true }
     )
     .setTimestamp();
 
-  /* ========== MULTI-LINK SUPPORT ========== */
+  /* ========== LINKS ========== */
   const components = [];
 
   if (link) {
@@ -178,3 +177,4 @@ client.on("messageCreate", msg => {
 });
 
 client.login(process.env.TOKEN);
+
