@@ -23,6 +23,7 @@ const client = new Client({
 /* ================= CONFIG ================= */
 const ROLE_NAME = "Aniketshare/Noti";
 const BRAND_COLOR = 0x595967;
+const SEPARATOR = "----------------";
 
 /* ================= AUTO STATUS ================= */
 const statuses = [
@@ -113,7 +114,7 @@ client.on("interactionCreate", async (interaction) => {
         .join("\n")
     : fileInput;
 
-  /* ========== EMBED (FINAL LAYOUT) ========== */
+  /* ========== EMBED ========== */
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)
     .setAuthor({
@@ -121,14 +122,16 @@ client.on("interactionCreate", async (interaction) => {
       iconURL: interaction.guild.iconURL({ dynamic: true })
     })
     .setDescription(
-      `**Project:** ${project}\n\n` +
-      `**Files:**\n${files}\n\n` +
+      `**Project:** ${project}\n` +
+      `${SEPARATOR}\n` +
+      `**Files:**\n${files}\n` +
+      `${SEPARATOR}\n` +
       `Status: ${status}\n` +
       `Size: ${size}`
     )
     .setTimestamp();
 
-  /* ========== BUTTON ONLY (NO LINK TEXT) ========== */
+  /* ========== BUTTON ========== */
   const components = [];
 
   if (link) {
@@ -143,10 +146,7 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   try {
-    await user.send({
-      embeds: [embed],
-      components
-    });
+    await user.send({ embeds: [embed], components });
 
     await interaction.reply({
       content: `✅ Notification sent to **${user.tag}**`,
@@ -167,6 +167,7 @@ client.on("messageCreate", msg => {
 });
 
 client.login(process.env.TOKEN);
+
 
 
 
