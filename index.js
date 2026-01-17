@@ -113,7 +113,7 @@ client.on("interactionCreate", async (interaction) => {
         .join("\n")
     : fileInput;
 
-  /* ========== EMBED (FINAL LAYOUT) ========== */
+  /* ========== EMBED (SPACING FIXED) ========== */
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)
     .setAuthor({
@@ -121,14 +121,14 @@ client.on("interactionCreate", async (interaction) => {
       iconURL: interaction.guild.iconURL({ dynamic: true })
     })
     .setDescription(
-      `**Project:** ${project}\n\n` +
-      `**Files:**\n${files}\n\n` +
+      `**Project:** ${project}\n` +
+      `**Files:**\n${files}\n` +
       `Status: ${status}\n` +
       `Size: ${size}`
     )
     .setTimestamp();
 
-  /* ========== BUTTON ONLY (NO LINK TEXT) ========== */
+  /* ========== BUTTON ONLY ========== */
   const components = [];
 
   if (link) {
@@ -167,5 +167,6 @@ client.on("messageCreate", msg => {
 });
 
 client.login(process.env.TOKEN);
+
 
 
