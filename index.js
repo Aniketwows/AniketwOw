@@ -59,7 +59,7 @@ const commands = [
     .addStringOption(o =>
       o
         .setName("link")
-        .setDescription("Multiple links (one per line)")
+        .setDescription("File link (button only)")
         .setRequired(false)
     )
 ].map(c => c.toJSON());
@@ -104,7 +104,7 @@ client.on("interactionCreate", async (interaction) => {
   const size    = interaction.options.getString("size") || "N/A";
   const link    = interaction.options.getString("link");
 
-  /* ===== FILE LIST (| → multiline) ===== */
+  /* ===== FILE LIST ( | → multiline ) ===== */
   const fileInput = interaction.options.getString("filename") || "—";
   const files = fileInput.includes("|")
     ? fileInput
@@ -113,41 +113,31 @@ client.on("interactionCreate", async (interaction) => {
         .join("\n")
     : fileInput;
 
-  /* ========== EMBED ========== */
+  /* ========== EMBED (FINAL LAYOUT) ========== */
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)
     .setAuthor({
       name: `Notification from ${interaction.guild.name}`,
       iconURL: interaction.guild.iconURL({ dynamic: true })
     })
-    .addFields(
-      { name: "🧩 Project", value: project },
-      { name: "📁 Files", value: files },
-      { name: "📌 Status", value: status, inline: true },
-      { name: "📦 Size", value: size, inline: true }
+    .setDescription(
+      `**Project:** ${project}\n\n` +
+      `**Files:**\n${files}\n\n` +
+      `Status: ${status}\n` +
+      `Size: ${size}`
     )
     .setTimestamp();
 
-  /* ========== LINKS ========== */
+  /* ========== BUTTON ONLY (NO LINK TEXT) ========== */
   const components = [];
 
   if (link) {
-    const linksFormatted = link
-      .split("\n")
-      .map((l, i) => `[File ${i + 1}](${l.trim()})`)
-      .join("\n");
-
-    embed.addFields({
-      name: "🔗 Links",
-      value: linksFormatted
-    });
-
     components.push(
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setLabel("📥 Open Files")
           .setStyle(ButtonStyle.Link)
-          .setURL(link.split("\n")[0].trim())
+          .setURL(link.trim())
       )
     );
   }
@@ -177,4 +167,5 @@ client.on("messageCreate", msg => {
 });
 
 client.login(process.env.TOKEN);
+
 
