@@ -118,7 +118,7 @@ client.on("interactionCreate", async (interaction) => {
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)
     .setAuthor({
-      name: `Notification from tarb0ush `,
+      name: `Notification from AniketwOw `,
       iconURL: interaction.guild.iconURL({ dynamic: true })
     })
     .setDescription(
