@@ -1,13 +1,17 @@
 {
-  "name": "aniketwow-bot",
+  "name": "aniketwOw-discord-bot",
   "version": "1.0.0",
+  "description": "Client DM file & thumbnail management bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.7",
     "dotenv": "^16.4.5"
   }
 }
+
