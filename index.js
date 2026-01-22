@@ -1,174 +1,172 @@
+require("dotenv").config();
 const {
   Client,
   GatewayIntentBits,
-  ActivityType,
   SlashCommandBuilder,
-  Routes,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  REST,
+  Routes
 } = require("discord.js");
-const { REST } = require("@discordjs/rest");
+
+const db = require("./db");
 
 const client = new Client({
   intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.DirectMessages
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.MessageContent
   ]
 });
 
-/* ================= CONFIG ================= */
-const ROLE_NAME = "Aniketshare/Noti";
-const BRAND_COLOR = 0x595967;
-const SEPARATOR = "----------------";
-
-/* ================= AUTO STATUS ================= */
-const statuses = [
-  { name: "Designing in Photoshop 🎨", type: ActivityType.Playing },
-  { name: "Turning Ideas into Art ✨", type: ActivityType.Watching },
-  { name: "Creative Mode: ON ⚡", type: ActivityType.Listening }
-];
-let statusIndex = 0;
-
-/* ================= SLASH COMMAND ================= */
+/* ---------- SLASH COMMANDS ---------- */
 const commands = [
   new SlashCommandBuilder()
-    .setName("noti")
-    .setDescription("Send professional DM notification")
-    .setDefaultMemberPermissions(0)
-    .addUserOption(o =>
-      o.setName("user").setDescription("User to notify").setRequired(true)
-    )
-    .addStringOption(o =>
-      o.setName("project").setDescription("Project name").setRequired(false)
-    )
-    .addStringOption(o =>
-      o
-        .setName("filename")
-        .setDescription("File names (use | for multiple)")
-        .setRequired(false)
-    )
-    .addStringOption(o =>
-      o.setName("status").setDescription("Status").setRequired(false)
-    )
-    .addStringOption(o =>
-      o.setName("size").setDescription("File size").setRequired(false)
-    )
-    .addStringOption(o =>
-      o
-        .setName("link")
-        .setDescription("File link (button only)")
-        .setRequired(false)
-    )
-].map(c => c.toJSON());
+    .setName("savefile")
+    .setDescription("Save final file for client")
+    .addUserOption(o => o.setName("client").setDescription("Client").setRequired(true))
+    .addStringOption(o => o.setName("project").setDescription("Project").setRequired(true))
+    .addStringOption(o => o.setName("filename").setDescription("File name").setRequired(true))
+    .addStringOption(o => o.setName("link").setDescription("Drive link").setRequired(true)),
 
-const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
+  new SlashCommandBuilder()
+    .setName("myfiles")
+    .setDescription("Get your files"),
 
-/* ================= READY ================= */
-client.once("clientReady", async () => {
-  console.log(`✅ Bot Online: ${client.user.tag}`);
-  client.user.setStatus("online");
+  new SlashCommandBuilder()
+    .setName("thumbnail")
+    .setDescription("Send thumbnail preview")
+    .addUserOption(o => o.setName("client").setDescription("Client").setRequired(true))
+    .addAttachmentOption(o => o.setName("image").setDescription("Preview image").setRequired(true))
+];
 
-  setInterval(() => {
-    const s = statuses[statusIndex];
-    client.user.setActivity(s.name, { type: s.type });
-    statusIndex = (statusIndex + 1) % statuses.length;
-  }, 10000);
+const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
 
+client.once("ready", async () => {
   await rest.put(
     Routes.applicationCommands(client.user.id),
     { body: commands }
   );
-
-  console.log("✅ /noti command registered");
+  console.log("Bot online & commands registered");
 });
 
-/* ================= COMMAND HANDLER ================= */
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-  if (interaction.commandName !== "noti") return;
+/* ---------- INTERACTIONS ---------- */
+client.on("interactionCreate", async interaction => {
 
-  if (!interaction.member.roles.cache.some(r => r.name === ROLE_NAME)) {
-    return interaction.reply({
-      content: "❌ You don't have permission to use this command.",
-      ephemeral: true
-    });
+  /* ===== SLASH COMMANDS ===== */
+  if (interaction.isChatInputCommand()) {
+
+    /* ADMIN ONLY */
+    if (interaction.commandName === "savefile") {
+      if (interaction.user.id !== process.env.ADMIN_ID)
+        return interaction.reply({ content: "Not allowed", ephemeral: true });
+
+      const clientUser = interaction.options.getUser("client");
+      const project = interaction.options.getString("project");
+      const filename = interaction.options.getString("filename");
+      const link = interaction.options.getString("link");
+
+      db.run(
+        "INSERT INTO files (client_id, project, filename, link) VALUES (?,?,?,?)",
+        [clientUser.id, project, filename, link]
+      );
+
+      const embed = new EmbedBuilder()
+        .setTitle("Files Updated")
+        .addFields(
+          { name: "Project", value: project },
+          { name: "File", value: filename }
+        );
+
+      await clientUser.send({ embeds: [embed] });
+      return interaction.reply({ content: "File saved & client notified", ephemeral: true });
+    }
+
+    /* CLIENT */
+    if (interaction.commandName === "myfiles") {
+      db.all(
+        "SELECT project, filename FROM files WHERE client_id=?",
+        [interaction.user.id],
+        (err, rows) => {
+          if (!rows || rows.length === 0)
+            return interaction.reply({ content: "No files found", ephemeral: true });
+
+          const embed = new EmbedBuilder().setTitle("Your Files");
+          const row = new ActionRowBuilder();
+
+          rows.forEach((f, i) => {
+            embed.addFields({
+              name: `${i + 1}. ${f.project}`,
+              value: f.filename
+            });
+
+            row.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`get_${f.filename}`)
+                .setLabel(`Download ${i + 1}`)
+                .setStyle(ButtonStyle.Primary)
+            );
+          });
+
+          interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        }
+      );
+    }
+
+    /* THUMBNAIL PREVIEW */
+    if (interaction.commandName === "thumbnail") {
+      if (interaction.user.id !== process.env.ADMIN_ID)
+        return interaction.reply({ content: "Not allowed", ephemeral: true });
+
+      const clientUser = interaction.options.getUser("client");
+      const image = interaction.options.getAttachment("image");
+
+      const embed = new EmbedBuilder()
+        .setTitle("Thumbnail Preview")
+        .setImage(image.url)
+        .setDescription("Please review and respond");
+
+      const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("approve").setLabel("Approve").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId("changes").setLabel("Changes Needed").setStyle(ButtonStyle.Danger)
+      );
+
+      await clientUser.send({ embeds: [embed], components: [buttons] });
+      interaction.reply({ content: "Preview sent", ephemeral: true });
+    }
   }
 
-  const user = interaction.options.getUser("user");
+  /* ===== BUTTONS ===== */
+  if (interaction.isButton()) {
 
-  const project = interaction.options.getString("project") || "—";
-  const status  = interaction.options.getString("status") || "In progress";
-  const size    = interaction.options.getString("size") || "N/A";
-  const link    = interaction.options.getString("link");
+    if (interaction.customId.startsWith("get_")) {
+      const filename = interaction.customId.replace("get_", "");
 
-  /* ===== FILE LIST ( | → multiline ) ===== */
-  const fileInput = interaction.options.getString("filename") || "—";
-  const files = fileInput.includes("|")
-    ? fileInput
-        .split("|")
-        .map(f => `• ${f.trim()}`)
-        .join("\n")
-    : fileInput;
+      db.get(
+        "SELECT link FROM files WHERE client_id=? AND filename=?",
+        [interaction.user.id, filename],
+        (err, row) => {
+          if (!row)
+            return interaction.reply({ content: "File not found", ephemeral: true });
 
-  /* ========== EMBED ========== */
-  const embed = new EmbedBuilder()
-    .setColor(BRAND_COLOR)
-    .setAuthor({
-      name: `Notification from AniketwOw `,
-      iconURL: interaction.guild.iconURL({ dynamic: true })
-    })
-    .setDescription(
-      `**Project:** ${project}\n` +
-      `${SEPARATOR}\n` +
-      `**Files:**\n${files}\n` +
-      `${SEPARATOR}\n` +
-      `Status: ${status}\n` +
-      `Size: ${size}`
-    )
-    .setTimestamp();
+          interaction.reply({ content: row.link, ephemeral: true });
+        }
+      );
+    }
 
-  /* ========== BUTTON ========== */
-  const components = [];
+    if (interaction.customId === "approve") {
+      interaction.reply({ content: "Approved ✔", ephemeral: true });
+      client.users.fetch(process.env.ADMIN_ID)
+        .then(u => u.send("Client approved thumbnail"));
+    }
 
-  if (link) {
-    components.push(
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setLabel("📥 Open Files")
-          .setStyle(ButtonStyle.Link)
-          .setURL(link.trim())
-      )
-    );
-  }
-
-  try {
-    await user.send({ embeds: [embed], components });
-
-    await interaction.reply({
-      content: `✅ Notification sent to **${user.tag}**`,
-      ephemeral: true
-    });
-  } catch {
-    await interaction.reply({
-      content: "❌ User ke DMs closed hain.",
-      ephemeral: true
-    });
+    if (interaction.customId === "changes") {
+      interaction.reply({ content: "Changes requested ❌", ephemeral: true });
+      client.users.fetch(process.env.ADMIN_ID)
+        .then(u => u.send("Client requested changes"));
+    }
   }
 });
 
-/* ================= TEST ================= */
-client.on("messageCreate", msg => {
-  if (msg.author.bot) return;
-  if (msg.content === "!ping") msg.reply("🏓 Pong!");
-});
-
-client.login(process.env.TOKEN);
-
-
-
-
-
+client.login(process.env.DISCORD_TOKEN);
