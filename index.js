@@ -8,7 +8,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ActivityType
+  ActivityType,
+  PermissionFlagsBits
 } = require("discord.js");
 
 const client = new Client({
@@ -30,7 +31,7 @@ const statuses = [
 
 let statusIndex = 0;
 
-/* ================= SIMPLE MEMORY DB ================= */
+/* ================= MEMORY DB ================= */
 
 const filesDB = {}; // userId : [{ title, link }]
 
@@ -49,11 +50,24 @@ client.once("ready", async () => {
     client.user.setActivity(statuses[statusIndex]);
   }, 10000);
 
-  // Register slash commands
   await client.application.commands.set([
+    // ADMIN: /noti (UNCHANGED behavior)
+    new SlashCommandBuilder()
+      .setName("noti")
+      .setDescription("Send personal DM notification to client")
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addUserOption(o =>
+        o.setName("client").setDescription("Client").setRequired(true)
+      )
+      .addStringOption(o =>
+        o.setName("message").setDescription("Message").setRequired(true)
+      ),
+
+    // ADMIN: /savefile
     new SlashCommandBuilder()
       .setName("savefile")
-      .setDescription("Save final file link for client")
+      .setDescription("Save final file for client")
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
       .addUserOption(o =>
         o.setName("client").setDescription("Client").setRequired(true)
       )
@@ -64,36 +78,64 @@ client.once("ready", async () => {
         o.setName("link").setDescription("Drive link").setRequired(true)
       ),
 
+    // ADMIN: /thumbnail
     new SlashCommandBuilder()
       .setName("thumbnail")
       .setDescription("Send thumbnail preview to client")
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
       .addUserOption(o =>
         o.setName("client").setDescription("Client").setRequired(true)
       )
       .addAttachmentOption(o =>
-        o.setName("image").setDescription("Thumbnail image").setRequired(true)
+        o.setName("image").setDescription("Thumbnail").setRequired(true)
       ),
 
+    // CLIENT: /myfiles
     new SlashCommandBuilder()
       .setName("myfiles")
-      .setDescription("Client: view your saved files")
+      .setDescription("View your saved files")
   ]);
 });
 
 /* ================= INTERACTIONS ================= */
 
 client.on("interactionCreate", async interaction => {
+  if (!interaction.isChatInputCommand() && !interaction.isButton()) return;
+
+  /* ---------- ADMIN CHECK ---------- */
+  const isAdmin =
+    !process.env.ADMIN_ID || interaction.user.id === process.env.ADMIN_ID;
+
+  /* ---------- COMMANDS ---------- */
   if (interaction.isChatInputCommand()) {
     const { commandName } = interaction;
 
-    /* ---- /savefile ---- */
+    /* /noti (UNCHANGED SIMPLE DM) */
+    if (commandName === "noti") {
+      if (!isAdmin)
+        return interaction.reply({ content: "Not allowed.", ephemeral: true });
+
+      const user = interaction.options.getUser("client");
+      const message = interaction.options.getString("message");
+
+      await user.send(message); // EXACT old behavior
+      return interaction.reply({
+        content: "Notification sent.",
+        ephemeral: true
+      });
+    }
+
+    /* /savefile */
     if (commandName === "savefile") {
-      const clientUser = interaction.options.getUser("client");
+      if (!isAdmin)
+        return interaction.reply({ content: "Not allowed.", ephemeral: true });
+
+      const user = interaction.options.getUser("client");
       const title = interaction.options.getString("title");
       const link = interaction.options.getString("link");
 
-      if (!filesDB[clientUser.id]) filesDB[clientUser.id] = [];
-      filesDB[clientUser.id].push({ title, link });
+      if (!filesDB[user.id]) filesDB[user.id] = [];
+      filesDB[user.id].push({ title, link });
 
       const embed = new EmbedBuilder()
         .setTitle("📁 File Delivered")
@@ -103,13 +145,19 @@ client.on("interactionCreate", async interaction => {
         )
         .setColor(0x00ff99);
 
-      await clientUser.send({ embeds: [embed] });
-      await interaction.reply({ content: "File saved & sent in DM", ephemeral: true });
+      await user.send({ embeds: [embed] });
+      return interaction.reply({
+        content: "File saved & sent.",
+        ephemeral: true
+      });
     }
 
-    /* ---- /thumbnail ---- */
+    /* /thumbnail */
     if (commandName === "thumbnail") {
-      const clientUser = interaction.options.getUser("client");
+      if (!isAdmin)
+        return interaction.reply({ content: "Not allowed.", ephemeral: true });
+
+      const user = interaction.options.getUser("client");
       const image = interaction.options.getAttachment("image");
 
       const embed = new EmbedBuilder()
@@ -128,37 +176,42 @@ client.on("interactionCreate", async interaction => {
           .setStyle(ButtonStyle.Danger)
       );
 
-      await clientUser.send({ embeds: [embed], components: [row] });
-      await interaction.reply({ content: "Thumbnail sent in DM", ephemeral: true });
+      await user.send({ embeds: [embed], components: [row] });
+      return interaction.reply({
+        content: "Thumbnail sent.",
+        ephemeral: true
+      });
     }
 
-    /* ---- /myfiles ---- */
+    /* /myfiles (CLIENT ONLY) */
     if (commandName === "myfiles") {
       const data = filesDB[interaction.user.id];
-      if (!data || data.length === 0) {
-        return interaction.reply({ content: "No files found.", ephemeral: true });
-      }
+      if (!data || data.length === 0)
+        return interaction.reply({
+          content: "No files found.",
+          ephemeral: true
+        });
 
       const embed = new EmbedBuilder()
         .setTitle("📂 Your Files")
         .setColor(0x00bfff);
 
-      data.forEach(f => {
-        embed.addFields({ name: f.title, value: f.link });
-      });
+      data.forEach(f => embed.addFields({ name: f.title, value: f.link }));
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], ephemeral: true });
     }
   }
 
-  /* ---- BUTTONS ---- */
+  /* ---------- BUTTONS ---------- */
   if (interaction.isButton()) {
-    if (interaction.customId === "approve") {
-      await interaction.reply({ content: "✅ Approved", ephemeral: true });
-    }
-    if (interaction.customId === "changes") {
-      await interaction.reply({ content: "✏️ Changes requested", ephemeral: true });
-    }
+    if (interaction.customId === "approve")
+      return interaction.reply({ content: "✅ Approved", ephemeral: true });
+
+    if (interaction.customId === "changes")
+      return interaction.reply({
+        content: "✏️ Changes requested",
+        ephemeral: true
+      });
   }
 });
 
