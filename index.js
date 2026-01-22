@@ -1,239 +1,169 @@
 const {
   Client,
   GatewayIntentBits,
-  Partials,
+  ActivityType,
+  SlashCommandBuilder,
+  Routes,
   EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require("discord.js");
+const { REST } = require("@discordjs/rest");
 
-const fs = require("fs");
-const path = require("path");
-require("dotenv").config();
-
-/* ===================== CLIENT ===================== */
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-  ],
-  partials: [Partials.Channel],
+    GatewayIntentBits.DirectMessages
+  ]
 });
 
-/* ===================== SETTINGS ===================== */
-const PREFIX = "!";
-const OWNER_ID = "YOUR_DISCORD_ID_HERE"; // ✅ apna discord ID daalo
+/* ================= CONFIG ================= */
+const ROLE_NAME = "Aniketshare/Noti";
+const BRAND_COLOR = 0x595967;
+const SEPARATOR = "----------------";
 
-// ✅ Railway persistent disk recommended (but without it also works while running)
-const DB_PATH = path.join(__dirname, "vault.json");
+/* ================= AUTO STATUS ================= */
+const statuses = [
+  { name: "Designing in Photoshop 🎨", type: ActivityType.Playing },
+  { name: "Turning Ideas into Art ✨", type: ActivityType.Watching },
+  { name: "Creative Mode: ON ⚡", type: ActivityType.Listening }
+];
+let statusIndex = 0;
 
-/* ===================== DB HELPERS ===================== */
-function loadDB() {
-  try {
-    if (!fs.existsSync(DB_PATH)) return {};
-    return JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
-  } catch (e) {
-    console.log("DB Load Error:", e);
-    return {};
-  }
-}
+/* ================= SLASH COMMAND ================= */
+const commands = [
+  new SlashCommandBuilder()
+    .setName("noti")
+    .setDescription("Send professional DM notification")
+    .setDefaultMemberPermissions(0)
+    .addUserOption(o =>
+      o.setName("user").setDescription("User to notify").setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName("project").setDescription("Project name").setRequired(false)
+    )
+    .addStringOption(o =>
+      o
+        .setName("filename")
+        .setDescription("File names (use | for multiple)")
+        .setRequired(false)
+    )
+    .addStringOption(o =>
+      o.setName("status").setDescription("Status").setRequired(false)
+    )
+    .addStringOption(o =>
+      o.setName("size").setDescription("File size").setRequired(false)
+    )
+    .addStringOption(o =>
+      o
+        .setName("link")
+        .setDescription("File link (button only)")
+        .setRequired(false)
+    )
+].map(c => c.toJSON());
 
-function saveDB(db) {
-  try {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-  } catch (e) {
-    console.log("DB Save Error:", e);
-  }
-}
+const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
-/* ===================== READY ===================== */
-client.once("ready", () => {
-  console.log(`✅ Bot is online: ${client.user.tag}`);
+/* ================= READY ================= */
+client.once("clientReady", async () => {
+  console.log(`✅ Bot Online: ${client.user.tag}`);
+  client.user.setStatus("online");
+
+  setInterval(() => {
+    const s = statuses[statusIndex];
+    client.user.setActivity(s.name, { type: s.type });
+    statusIndex = (statusIndex + 1) % statuses.length;
+  }, 10000);
+
+  await rest.put(
+    Routes.applicationCommands(client.user.id),
+    { body: commands }
+  );
+
+  console.log("✅ /noti command registered");
 });
 
-/* ===========================================================
-   ✅ DM CLIENT FILE VAULT SYSTEM (EXTRA FEATURE ONLY)
-   ✅ This will NOT affect your existing server commands
-   ✅ Works only in DMs
-=========================================================== */
-client.on("messageCreate", async (msg) => {
+/* ================= COMMAND HANDLER ================= */
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  if (interaction.commandName !== "noti") return;
+
+  if (!interaction.member.roles.cache.some(r => r.name === ROLE_NAME)) {
+    return interaction.reply({
+      content: "❌ You don't have permission to use this command.",
+      ephemeral: true
+    });
+  }
+
+  const user = interaction.options.getUser("user");
+
+  const project = interaction.options.getString("project") || "—";
+  const status  = interaction.options.getString("status") || "In progress";
+  const size    = interaction.options.getString("size") || "N/A";
+  const link    = interaction.options.getString("link");
+
+  /* ===== FILE LIST ( | → multiline ) ===== */
+  const fileInput = interaction.options.getString("filename") || "—";
+  const files = fileInput.includes("|")
+    ? fileInput
+        .split("|")
+        .map(f => `• ${f.trim()}`)
+        .join("\n")
+    : fileInput;
+
+  /* ========== EMBED ========== */
+  const embed = new EmbedBuilder()
+    .setColor(BRAND_COLOR)
+    .setAuthor({
+      name: `Notification from AniketwOw `,
+      iconURL: interaction.guild.iconURL({ dynamic: true })
+    })
+    .setDescription(
+      `**Project:** ${project}\n` +
+      `${SEPARATOR}\n` +
+      `**Files:**\n${files}\n` +
+      `${SEPARATOR}\n` +
+      `Status: ${status}\n` +
+      `Size: ${size}`
+    )
+    .setTimestamp();
+
+  /* ========== BUTTON ========== */
+  const components = [];
+
+  if (link) {
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel("📥 Open Files")
+          .setStyle(ButtonStyle.Link)
+          .setURL(link.trim())
+      )
+    );
+  }
+
   try {
-    if (msg.author.bot) return;
+    await user.send({ embeds: [embed], components });
 
-    // ✅ ONLY DM commands (server system untouched)
-    if (msg.guild) return;
-
-    const text = msg.content.trim();
-    if (!text.startsWith(PREFIX)) return;
-
-    const db = loadDB();
-
-    /* ===================== CLIENT COMMANDS ===================== */
-
-    // !files => client sees their saved file titles
-    if (text === "!files") {
-      const userId = msg.author.id;
-      const userVault = db[userId] || [];
-
-      if (userVault.length === 0) {
-        return msg.reply("📭 Tumhare liye abhi koi files saved nahi hai.");
-      }
-
-      const list = userVault
-        .map((f, i) => `**${i + 1}.** ${f.title}`)
-        .join("\n");
-
-      const embed = new EmbedBuilder()
-        .setTitle("📁 Your Saved Files")
-        .setDescription(list)
-        .setFooter({ text: "Use: !get <title>" });
-
-      return msg.reply({ embeds: [embed] });
-    }
-
-    // !get <title> => client gets file link
-    if (text.startsWith("!get ")) {
-      const userId = msg.author.id;
-      const query = text.replace("!get ", "").trim().toLowerCase();
-
-      const userVault = db[userId] || [];
-      const found = userVault.find((f) => f.title.toLowerCase() === query);
-
-      if (!found) {
-        return msg.reply("❌ File nahi mili. `!files` karke list dekho.");
-      }
-
-      const embed = new EmbedBuilder()
-        .setTitle(`📥 ${found.title}`)
-        .setDescription(`🔗 **Link:** ${found.link}`)
-        .setFooter({ text: "Agar link open na ho to copy paste kar lena." });
-
-      return msg.reply({ embeds: [embed] });
-    }
-
-    /* ===================== OWNER ONLY COMMANDS ===================== */
-    if (msg.author.id !== OWNER_ID) {
-      // ✅ help for normal clients
-      if (text === "!help") {
-        return msg.reply(
-          `📌 **Commands**\n\n` +
-            `👤 Client:\n` +
-            `• \`!files\` = saved files list\n` +
-            `• \`!get <title>\` = file link\n`
-        );
-      }
-      return;
-    }
-
-    // !save @client title | link
-    if (text.startsWith("!save ")) {
-      const mentioned = msg.mentions.users.first();
-      if (!mentioned) {
-        return msg.reply(
-          "❌ Format: `!save @client title | link`\nExample: `!save @aniket Logo Pack | https://drive...`"
-        );
-      }
-
-      const rest = text.replace("!save ", "");
-
-      const cleaned = rest
-        .replace(`<@${mentioned.id}>`, "")
-        .replace(`<@!${mentioned.id}>`, "")
-        .trim();
-
-      const parts = cleaned.split("|");
-      if (parts.length < 2) {
-        return msg.reply("❌ Format wrong. Use: `title | link`");
-      }
-
-      const title = parts[0].trim();
-      const link = parts[1].trim();
-
-      if (!title || !link) return msg.reply("❌ Title & link required.");
-
-      if (!db[mentioned.id]) db[mentioned.id] = [];
-
-      // overwrite if same title exists
-      db[mentioned.id] = db[mentioned.id].filter(
-        (f) => f.title.toLowerCase() !== title.toLowerCase()
-      );
-
-      db[mentioned.id].push({
-        title,
-        link,
-        savedAt: Date.now(),
-      });
-
-      saveDB(db);
-
-      await msg.reply(`✅ Saved for **${mentioned.username}**: **${title}**`);
-
-      // notify client
-      try {
-        await mentioned.send(
-          `✅ Tumhare liye ek file save hua hai: **${title}**\nUse: \`!files\` ya \`!get ${title}\``
-        );
-      } catch (e) {}
-
-      return;
-    }
-
-    // !delete @client title
-    if (text.startsWith("!delete ")) {
-      const mentioned = msg.mentions.users.first();
-      if (!mentioned) return msg.reply("❌ Format: `!delete @client title`");
-
-      const title = text
-        .replace("!delete ", "")
-        .replace(`<@${mentioned.id}>`, "")
-        .replace(`<@!${mentioned.id}>`, "")
-        .trim();
-
-      if (!db[mentioned.id] || db[mentioned.id].length === 0) {
-        return msg.reply("❌ Is client ke paas koi file saved nahi hai.");
-      }
-
-      const before = db[mentioned.id].length;
-
-      db[mentioned.id] = db[mentioned.id].filter(
-        (f) => f.title.toLowerCase() !== title.toLowerCase()
-      );
-
-      if (db[mentioned.id].length === before) {
-        return msg.reply("❌ Title match nahi mila.");
-      }
-
-      saveDB(db);
-      return msg.reply(`🗑️ Deleted **${title}** for **${mentioned.username}**`);
-    }
-
-    // !clear @client
-    if (text.startsWith("!clear ")) {
-      const mentioned = msg.mentions.users.first();
-      if (!mentioned) return msg.reply("❌ Format: `!clear @client`");
-
-      db[mentioned.id] = [];
-      saveDB(db);
-
-      return msg.reply(`✅ Cleared all files for **${mentioned.username}**`);
-    }
-
-    // owner help
-    if (text === "!help") {
-      return msg.reply(
-        `📌 **Commands**\n\n` +
-          `👑 Owner:\n` +
-          `• \`!save @client title | link\`\n` +
-          `• \`!delete @client title\`\n` +
-          `• \`!clear @client\`\n\n` +
-          `👤 Client:\n` +
-          `• \`!files\`\n` +
-          `• \`!get <title>\`\n`
-      );
-    }
-  } catch (err) {
-    console.log("DM Vault Error:", err);
+    await interaction.reply({
+      content: `✅ Notification sent to **${user.tag}**`,
+      ephemeral: true
+    });
+  } catch {
+    await interaction.reply({
+      content: "❌ User ke DMs closed hain.",
+      ephemeral: true
+    });
   }
 });
 
-/* ===================== LOGIN ===================== */
+/* ================= TEST ================= */
+client.on("messageCreate", msg => {
+  if (msg.author.bot) return;
+  if (msg.content === "!ping") msg.reply("🏓 Pong!");
+});
+
 client.login(process.env.TOKEN);
